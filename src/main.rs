@@ -19,20 +19,25 @@ use cursive::{view::{Nameable, Resizable, scroll::Scroller}, views::{TextView, T
 use cursive::align::HAlign;
 use cursive::event::Key;
 use cursive::Cursive;
+use cursive::theme::{BaseColor::*, Color::*, PaletteColor::*};
+use std::io::BufRead;
+use std::io::BufReader;
+use std::process::Command;
+use std::process::Stdio;
 
 //*****************************************************************************
 // GLOBALS
 //*****************************************************************************
 const MAIN_TITLE: &str = ":uish:";
 const COPYRIGHT: &str = ":uish: © JPL 2023";
-const WELCOME: &str = "Welcome to :uish: - F4 to quit";
+const WELCOME: &str = "Welcome to :uish: - F3 to quit";
 
 //*****************************************************************************
 // main()
 //*****************************************************************************
 pub fn main() {
     let mut c = cursive::default();
-    
+
     let core_console = TextView::new("")
         .with_name("console")
         .full_height();
@@ -74,12 +79,32 @@ pub fn main() {
             .child(TextView::new(WELCOME)
                 .with_name("statusbar")
                 .full_width())
-            .child(TextView::new("0/0")
+            .child(TextView::new("OK")
                 .with_name("RC"))
         );
 
     c.add_fullscreen_layer(linear_layout.full_screen());
-    c.add_global_callback(Key::F4, |c| c.quit());
+    c.add_global_callback(Key::F3, |c| c.quit());
+    // c.load_theme_file("assets/style.toml").unwrap();
+    
+    let mut palette = cursive::theme::Palette::default();
+    palette[Background] =Dark(Black);
+    palette[Shadow] = Dark(Black); 
+    palette[View] = Dark(Black);
+    palette[Primary] = Light(Yellow);
+    palette[Secondary] = Light(Green);
+    palette[Tertiary] = Light(Green);
+    palette[TitlePrimary] = Light(Green);
+    palette[TitleSecondary] = Light(Green);
+    palette[Highlight] = Light(Green);
+    palette[HighlightInactive] = Light(Green);
+    palette[HighlightText] = Light(Green);    
+    let theme = cursive::theme::Theme{
+        shadow: false,
+        borders: cursive::theme::BorderStyle::None,
+        palette: palette,
+    };
+    c.set_theme(theme);
 
     let cb_sink = c.cb_sink().clone();
     let sleep_duration = std::time::Duration::from_millis(1_000);  // 1 second
@@ -104,6 +129,7 @@ fn enter_fn(c: &mut Cursive) {
     let mut statusbar = c.find_name::<TextView>("statusbar").unwrap();
     let mut prompt = c.find_name::<TextArea>("prompt").unwrap();
     let mut console = c.find_name::<TextView>("console").unwrap();
+    let mut rc = c.find_name::<TextView>("RC").unwrap();
     let cmd = prompt.get_content();
 
     if cmd != "" {
@@ -111,8 +137,36 @@ fn enter_fn(c: &mut Cursive) {
             "quit" | "exit" => c.quit(),
             "cls" => console.set_content(""),
             _ => { 
-                console.append(cmd);
+                rc.set_content("⌛");
+                let mut child_result = Command::new("bash")
+                .args([
+                    "-c",
+                    cmd
+                ])
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .spawn();
+
+                if child_result.is_ok() {
+                    let stdout = child_result.as_mut().unwrap().stdout.take().unwrap();            
+                    // Stream output.
+                    let lines = BufReader::new(stdout).lines();
+                    for line in lines {
+                        console.append(line.unwrap());
+                        console.append("\n");
+                    }
+                    let stderr = child_result.unwrap().stderr.take().unwrap();            
+                    // Stream output.
+                    let lines = BufReader::new(stderr).lines();
+                    for line in lines {
+                        console.append(line.unwrap());
+                        console.append("\n");
+                    }
+                } else {
+                    console.append("Error");
+                }
                 console.append("\n");
+                rc.set_content("OK");
             },
         }
         statusbar.set_content(cmd);

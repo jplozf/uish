@@ -7,5 +7,5 @@ authors = ["J.-P. Liguori", "jpl <jpl@ozf.fr>"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-cursive = "*"
+cursive = { version = "*", features = ["toml"] }
 chrono = "*"
